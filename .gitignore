@@ -3,6 +3,11 @@ __pycache__/
 *.py[cod]
 *$py.class
 
+/220317 corte
+/archivo_cortes
+/informacion_gg
+/planillas
+
 # C extensions
 *.so
 
