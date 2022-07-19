@@ -7,6 +7,10 @@ __pycache__/
 /archivo_cortes
 /informacion_gg
 /planillas
+/input
+/output
+/post-jupyter
+/report
 
 # C extensions
 *.so
