@@ -13,11 +13,11 @@ class RECOBRO():
     conciliaciones = None
 
     def __init__(self) -> None: #[x]
-        self.f4_name = '220718_f4' #input('Ingrese el nombre de la planilla F4: ')
-        self.carpeta_corte = '220718' #input('Ingrese el nombre de la carpeta del corte: ')
+        self.f4_name = '221103_f4_clasificado' #input('Ingrese el nombre de la planilla F4: ')
+        self.carpeta_corte = '221104' #input('Ingrese el nombre de la carpeta del corte: ')
         self.carpeta_sap = 'partidas_sap' #input('Ingrese el nombre de la carpeta con los archvos SAP: ')
-        self.db_conciliaciones = '220630_recobro rev Kelly'
-        self.db_cf11 = '220601-1358-cf11_cd_21-all'
+        self.db_conciliaciones = '221104_recobro'
+        self.db_cf11 = '221020-1111-cf11_cd_21-output'
 
         print('Cargando archivos ...')
         self.load_files()
@@ -32,6 +32,7 @@ class RECOBRO():
 
         print('Ejecutando análisis ...')
         self.numeros_f4_reco = self.f4_reco[f4_var['nfolio']].unique()
+        print(self.conciliaciones.columns)
         self.numeros_f4_conciliacion = self.conciliaciones[f4_var['nfolio']].unique()
         self.numeros_f4_cf11 = self.cf11['f4'].unique()
 
@@ -43,7 +44,7 @@ class RECOBRO():
         self.cruce_sap_conc()
 
     def load_files(self): #[x]
-        self.planilla = pd.read_csv(f'input/{self.carpeta_corte}/{self.f4_name}.csv', dtype = 'object')
+        self.planilla = pd.read_csv(f'input/{self.carpeta_corte}/{self.f4_name}.csv', sep=';',  dtype = 'object')
         self.conciliaciones = pd.read_excel(f'input/{self.carpeta_corte}/{self.db_conciliaciones}.xlsx', dtype = str, sheet_name='DB')
         self.cf11 = pd.read_excel(f'input/{self.carpeta_corte}/{self.db_cf11}.xlsx', dtype = str, sheet_name='DB')
         path = f'input/{self.carpeta_corte}/{self.carpeta_sap}'
@@ -65,11 +66,11 @@ class RECOBRO():
         fechas = [f4_var['fr'], f4_var['fs']]
         for i in fechas:  self.planilla[i] = pd.to_datetime(self.planilla[i], format='%Y-%m-%d')
 
-        self.planilla.dropna(axis=1, how='all', inplace=True)
         self.planilla.drop([ 'TNOTAS','COPERARIO', 'NFORMULARIO', 'BMARGEN', 'DESCESTADO', 'USR_ENVIO','FECHA_ENVIO', 'USR_ANULADO', 
         'FECHA_ANULADO', 'DESCTIPO', 'CCENT_COSTO_F', 'PRD_LVL_CHILD', 'LOC_ID', 'LOC_NAME','PROD_CAT_ID','PROD_CAT_DESC', 'LOCAL_AGG',
         'MF04_UNIT_CST', 'PROD_BRAND_ID', 'USR_REGISTRO', 'USR_RESERVA'],axis=1, inplace=True)
-
+        self.planilla.dropna(axis=1, how='all', inplace=True)
+        print(self.planilla.head())
         #cols = ['CTECH_KEY',  'PRD_UPC', 'QF04_SHIP',  'TOTAL_COSTO', 'CESTADO',  'FECHA_REGISTRO',  'FECHA_RESERVA', 'PROD_NAME',  'CTIPO', 'XDESTINO','POSIBLE_CAUSA']
 
         # CF11
@@ -77,20 +78,21 @@ class RECOBRO():
 
         #CD
         #self.conciliaciones.rename(columns={'TRANSPORTADORA ':'TRANSPORTADORA_CD', 'F4':f4_var['nfolio'], 'REFERENCIA':'sku_producto',
-        #                'Nº  CONTABLE ':'ref_sap', 'COSTO_TOTAL':'costo_total_f11_cd'}, inplace=True)
+        #                'Nº  CONTABLE ':'REF_SAP', 'COSTO_TOTAL':'costo_total_f11_cd'}, inplace=True)
         #self.conciliaciones['costo_total_f11_cd'] = pd.to_numeric(self.conciliaciones['costo_total_f11_cd'])
-        self.conciliaciones.columns = [col.lower() for col in self.conciliaciones.columns]
-        self.conciliaciones['ref_sap']= self.conciliaciones['ref_sap'].str.replace('-', '') 
-        self.conciliaciones.rename(columns={'nro_red_inventario':f4_var['nfolio']}, inplace=True)
+        #self.conciliaciones.columns = [col.lower() for col in self.conciliaciones.columns]
+        self.conciliaciones['REF_SAP']= self.conciliaciones['REF_SAP'].str.replace('-', '') 
+        #self.conciliaciones.rename(columns={'NFOLIO':f4_var['nfolio']}, inplace=True)
 
         #SAP
-        self.sap.rename(columns={'Clave referen.3':'transportadora_sap', 'Referencia':'ref_sap'}, inplace=True)
+        
         self.sap.columns = [col.lower() for col in self.sap.columns]
+        self.sap.rename(columns={'clave referen.3':'transportadora_sap', 'referencia':'REF_SAP'}, inplace=True)
         self.sap.to_excel('sap.xlsx')
         self.sap['fecha registr.diario'] = pd.to_datetime(self.sap['fecha registr.diario'])
-        self.sap['ref_sap'] = self.sap['ref_sap'].fillna('nan').str.replace('-','')
-        self.sap.drop_duplicates('ref_sap',inplace = True) # TODO revisar si se requiere
-        self.sap = self.sap.loc[self.sap['ref_sap'].notna()].reset_index(drop=True)
+        self.sap['REF_SAP'] = self.sap['REF_SAP'].fillna('nan').str.replace('-','')
+        self.sap.drop_duplicates('REF_SAP',inplace = True) # TODO revisar si se requiere
+        self.sap = self.sap.loc[self.sap['REF_SAP'].notna()].reset_index(drop=True)
         self.sap['importe (mon.soc.)'] = pd.to_numeric(self.sap['importe (mon.soc.)'])
 
     def f4_filters(self): #[x]
@@ -101,6 +103,7 @@ class RECOBRO():
         return f4_reco
 
     def compare_cf11_f4(self): #[x]
+        print(self.f4_reco.shape)
         self.f4_reco.loc[self.f4_reco[f4_var['nfolio']].isin(self.numeros_f4_cf11), 'ind_cf11'] = 'P-CF11'
         self.f4_reco.loc[~self.f4_reco[f4_var['nfolio']].isin(self.numeros_f4_cf11), 'ind_cf11'] = 'N-CF11' 
 
@@ -113,12 +116,13 @@ class RECOBRO():
         if nf4_ydf.shape[0] > 0: nf4_ydf.to_excel(f'output/{self.carpeta_corte}/{dt_string}_nf4_y{label}.xlsx',index=False)
 
     def get_dif_f4_cd(self): #[x]
-        info_conciliaciones = self.conciliaciones[[f4_var['nfolio'], 'nfolio', 'doc_contable', 'ref_sap', 'enviado_contabilidad']].reset_index(drop=True)
+        info_conciliaciones = self.conciliaciones[[f4_var['nfolio'], 'NFOLIO', 'DOC_CONTABLE', 'REF_SAP', 'ENVIADO_CONTABILIDAD']].reset_index(drop=True)
+        info_conciliaciones.drop_duplicates(f4_var['nfolio'], inplace=True)
         f4mcd = self.f4_reco.merge(info_conciliaciones, how='left', on=[f4_var['nfolio']]) #, 'sku_producto'])
         cdmf4 = self.f4_reco.merge(info_conciliaciones, how='right', on=[f4_var['nfolio']]) #, 'sku_producto'])
     
-        f4mcd.loc[f4mcd['nfolio'].notna(), 'ind_mf4' ] = 'yf4-ycd'
-        f4mcd.loc[f4mcd['nfolio'].isna(), 'ind_mf4' ] = 'yf4-ncd'
+        f4mcd.loc[f4mcd['NFOLIO'].notna(), 'ind_mf4' ] = 'yf4-ycd'
+        f4mcd.loc[f4mcd['NFOLIO'].isna(), 'ind_mf4' ] = 'yf4-ncd'
         cdmf4.loc[cdmf4[f4_var['estado']].isna(), 'ind_mf4' ] = 'nf4-ycd'
 
         yf4_ncd = f4mcd.loc[f4mcd['ind_mf4']=='yf4-ncd'].reset_index(drop=True)
@@ -132,10 +136,10 @@ class RECOBRO():
         
     def cruce_sap_conc(self):
         archivos_sap = self.sap [['fecha registr.diario', 'asiento compensación', 'ac creado por','transportadora_sap', 
-                    'tp.asiento contable', 'importe (mon.soc.)','ref_sap']].reset_index(drop=True)
+                    'tp.asiento contable', 'importe (mon.soc.)','REF_SAP']].reset_index(drop=True)
 
         f4mcd = self.get_dif_f4_cd()
-        recobro = f4mcd.merge(archivos_sap,how='left', on = 'ref_sap')
+        recobro = f4mcd.merge(archivos_sap,how='left', on = 'REF_SAP')
         recobro.loc[recobro['importe (mon.soc.)'].notna(), 'Indicador SAP'] = 'Encontrado en SAP'
         recobro.loc[recobro['importe (mon.soc.)'].isna(), 'Indicador SAP'] = 'No encontrado en SAP'
 
@@ -147,14 +151,14 @@ class RECOBRO():
         num_cols = recobro.select_dtypes('number')
         recobro[num_cols.columns] = num_cols.fillna(0)
 
-        gb_recobro = recobro.groupby(['LOCAL', f4_var['fs'], f4_var['nfolio'], 'nfolio', 
-                        'transportadora_f4', 'doc_contable', 'ref_sap', 'enviado_contabilidad', 
+        gb_recobro = recobro.groupby(['LOCAL', f4_var['fs'], f4_var['nfolio'], 'NFOLIO', 
+                        'TRANSPORTADORA_F4', 'DOC_CONTABLE', 'REF_SAP', 'ENVIADO_CONTABILIDAD', 
                         'fecha registr.diario', 'asiento compensación','ac creado por', 'transportadora_sap', 'tp.asiento contable',
                          'Indicador SAP', 'importe (mon.soc.)']).agg({f4_var['tc']:'sum'}).reset_index()
         gb_date_cols = gb_recobro.select_dtypes('datetime')
         gb_recobro[gb_date_cols.columns] = gb_date_cols.applymap(lambda x: pd.NaT if x == pd.to_datetime('01-01-2000', format='%d-%m-%Y') else x)
 
-        gb_documentos = recobro.groupby(['doc_contable', 'ref_sap', 'enviado_contabilidad', 
+        gb_documentos = recobro.groupby(['DOC_CONTABLE', 'REF_SAP', 'ENVIADO_CONTABILIDAD', 
                         'fecha registr.diario', 'asiento compensación','ac creado por', 'transportadora_sap', 'tp.asiento contable',
                          'Indicador SAP', 'importe (mon.soc.)']).agg({f4_var['tc']:'sum'}).reset_index()
         gb_documentos_date_cols = gb_documentos.select_dtypes('datetime')
@@ -176,6 +180,7 @@ def fltr_dado_baja(df): #[x]
     return df.loc[(df[f4_var['tipo']] == '4') ].reset_index(drop=True) 
 
 def fltr_reservado(df): #[x]
+    print(df[f4_var['estado']].unique())
     return df.loc[(df[f4_var['estado']] =='2')].reset_index(drop=True) 
 
 def fltr_fecha_desde(df): #[x]
@@ -185,20 +190,20 @@ def fltr_recobro(df): #[x]
     return df.loc[df[f4_var['ps']] == 'Recobro a transportadora'].reset_index(drop=True) 
 
 def get_transportadoras(df): #[x]
-    df.loc[df[f4_var['destino']].str.contains('depr'), 'transportadora_f4'] = 'Deprisa'
-    df.loc[df[f4_var['destino']].str.contains('servien',na=False), 'transportadora_f4'] = 'Servientrega'
-    df.loc[df[f4_var['destino']].str.contains(r'rotterdan|roterdan',na=False), 'transportadora_f4'] = 'Rotterdan'
-    df.loc[df[f4_var['destino']].str.contains('linio',na=False), 'transportadora_f4'] = 'Linio'
-    df.loc[df[f4_var['destino']].str.contains('tcc',na=False), 'transportadora_f4'] = 'Tcc'
-    df.loc[df[f4_var['destino']].str.contains('aldia',na=False), 'transportadora_f4'] = 'Aldia'
-    df.loc[df[f4_var['destino']].str.contains(r'logysto|vueltap',na=False), 'transportadora_f4'] = 'Logysto'
-    df.loc[df[f4_var['destino']].str.contains('empresari',na=False), 'transportadora_f4'] = 'Empresariales'
-    df.loc[df[f4_var['destino']].str.contains('teclogi',na=False), 'transportadora_f4'] = 'Teclogi'
-    df.loc[df[f4_var['destino']].str.contains(r'agil cargo|a.cargo',na=False), 'transportadora_f4'] = 'Agil cargo'
-    df.loc[df[f4_var['destino']].str.contains('mensajer',na=False), 'transportadora_f4'] = 'Mensajeros'
-    df.loc[df[f4_var['destino']].str.contains('exxe',na=False), 'transportadora_f4'] = 'Exxe'
-    df.loc[df[f4_var['destino']].str.contains('integra',na=False), 'transportadora_f4'] = 'Integra'
-    df.loc[df[f4_var['destino']].str.contains('corona',na=False), 'transportadora_f4'] = 'Corona'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('depr'), 'TRANSPORTADORA_F4'] = 'Deprisa'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('servien',na=False), 'TRANSPORTADORA_F4'] = 'Servientrega'
+    df.loc[df[f4_var['destino']].str.lower().str.contains(r'rotterdan|roterdan',na=False), 'TRANSPORTADORA_F4'] = 'Rotterdan'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('linio',na=False), 'TRANSPORTADORA_F4'] = 'Linio'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('tcc',na=False), 'TRANSPORTADORA_F4'] = 'Tcc'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('aldia',na=False), 'TRANSPORTADORA_F4'] = 'Aldia'
+    df.loc[df[f4_var['destino']].str.lower().str.contains(r'logysto|vueltap',na=False), 'TRANSPORTADORA_F4'] = 'Logysto'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('empresari',na=False), 'TRANSPORTADORA_F4'] = 'Empresariales'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('teclogi',na=False), 'TRANSPORTADORA_F4'] = 'Teclogi'
+    df.loc[df[f4_var['destino']].str.lower().str.contains(r'agil cargo|a.cargo',na=False), 'TRANSPORTADORA_F4'] = 'Agil cargo'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('mensajer',na=False), 'TRANSPORTADORA_F4'] = 'Mensajeros'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('exxe',na=False), 'TRANSPORTADORA_F4'] = 'Exxe'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('integra',na=False), 'TRANSPORTADORA_F4'] = 'Integra'
+    df.loc[df[f4_var['destino']].str.lower().str.contains('corona',na=False), 'TRANSPORTADORA_F4'] = 'Corona'
     return df 
 
 def load_sap_files(path): #[x]

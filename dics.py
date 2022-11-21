@@ -1,7 +1,7 @@
 f4_var ={
 'estado':'CESTADO',
 'destino':'XDESTINO',
-'ps':'POSIBLE_CAUSA',
+'ps':'Posible Causa',
 'fs':'FECHA_RESERVA', 
 'fr':'FECHA_REGISTRO',
 'tipo':'CTIPO', 
